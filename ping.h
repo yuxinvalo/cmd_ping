@@ -48,7 +48,7 @@ struct ip
 unsigned short checksum(unsigned short*, int);
 float timediff(struct timeval *, struct timeval *);
 void package(struct icmp*, int);
-int unpack(char *, char *);
+int unpackage(char *, int ,char *);
 
 
 #endif /*_PING_H_*/

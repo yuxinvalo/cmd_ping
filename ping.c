@@ -9,8 +9,7 @@
  ************************************************************************/
 
 #include "ping.h"
-
-enum err{argErr, sockErr, getHostNameErr, sendErr};
+enum err{argErr, sockErr, getHostNameErr, sendErr, recErr, unpErr};
 void printErr(int flag)
 {
     switch (flag)
@@ -27,6 +26,12 @@ void printErr(int flag)
             break;
         case sendErr:
             puts("sendto() socket error, continue.");
+            break;
+        case recErr:
+            puts("recvfrom() socket error, continue.");
+            break;
+        case unpErr:
+            puts("unpack() error, continue.");
             break;
         default: puts("Error inexpected!");
 
@@ -51,9 +56,10 @@ float timediff(struct timeval* begin, struct timeval* end)
 void package(struct icmp* stIcmp, int index)
 {}
 
-int unpack(char* c, char* c2)
+int unpackage(char* c, int n, char* c2)
 {
-    return 0;
+    int re = -1;
+    return re;
 }
 /*Check if argument 1 is an IP addr or a domain Name*/ 
 int checkType(char *argv)
@@ -98,6 +104,7 @@ int main(int argc, char* argv[])
 
     int sockFd = 0;
 
+    char buf[BUF_SIZE];
     memset(&from, '\0', sizeof(struct sockaddr_in));
     memset(&to, '\0', sizeof(struct sockaddr_in));
 
@@ -144,15 +151,37 @@ int main(int argc, char* argv[])
     printf("Start to ping : %s, %lu bytes data \n...",
         inet_ntoa(*(struct in_addr *)host->h_addr_list[0]),
          sizeof(struct icmp));
+    
     int nbRe = 0;
+    int nbSend = 1;
+    int nbRecv = 1;
     for (int i = 0 ; i < 6; ++i)
     {
         memset(&sendIcmp, '\0', sizeof(struct icmp));
         package(&sendIcmp, nbRe + 1);
-        printf("send socket index: %d", i+1); 
-        if((nbRe = sendto(sockFd, &sendIcmp, sizeof(struct icmp), 0, (struct sockaddr_in*)&to, sizeof(to)) == -1))
+        printf("send socket index: %d", nbSend + 1); 
+
+        //Send ping package
+        nbSend++;
+        if((nbRe = sendto(sockFd, &sendIcmp, sizeof(struct icmp), 0, (struct sockaddr_in*)&to, sizeof(to)) == -1)){
         printErr(sendErr);
         continue;
+        }
+
+        //Receive ping package
+        nbRecv++;
+        if((nbRe = recvfrom(sockFd, &sendIcmp, sizeof(struct icmp), 0,
+            (struct sockaddr_in*)&from, sizeof(to))) == -1)
+        {
+            printErr(recErr);
+            continue;
+        }
+        printf("receive socket index: %d, and unpack...", nbRecv + 1); 
+        if(unpackage(buf, nbRe, inet_ntoa(from.sin_addr)) == -1)
+        {
+            printErr(unpErr);
+        } 
+        sleep(0.5);
     }
 
 
