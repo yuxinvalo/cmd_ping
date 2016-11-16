@@ -9,6 +9,7 @@
  ************************************************************************/
 
 #include "ping.h"
+//=============Error Handle============================
 enum err{argErr, sockErr, getHostNameErr, sendErr, recErr, unpErr};
 void printErr(int flag)
 {
@@ -38,12 +39,27 @@ void printErr(int flag)
     }
 }
 
-unsigned short checksum(unsigned short* addr, int len)
+
+//=============CHECKSUM================================
+unsigned short checksum(unsigned short* addr, int len_struct)
 {
-    unsigned short z = *addr;
-    return z;
+    unsigned int sumRe = 0;
+    for (len_struct; len_struct > 1; len_struct-=2)
+    {
+        sumRe = sumRe + *addr++;
+    }
+    
+    if (len_struct == 1)
+    {
+        sumRe = sumRe + *(unsigned char *)addr;
+    }
+
+    sumRe = (sumRe >> 16) + (sumRe & 0xffff);
+    sumRe = sumRe + (sumRe >> 16);
+    return (unsigned short) ~sumRe;
 }
 
+//===========Time back and forth====================== 
 float timediff(struct timeval* begin, struct timeval* end)
 {
     long int diff = 0;
@@ -53,14 +69,26 @@ float timediff(struct timeval* begin, struct timeval* end)
     return (float)(diff / 1000);
 }
 
+//============Pack info and unpack info===============
 void package(struct icmp* stIcmp, int index)
-{}
+{
+    stIcmp->type = ICMP_SEND;
+    stIcmp->code = 0;
+    stIcmp->checksum = 0;
+    stIcmp->id = getpid();
+    stIcmp->sequence = index;
+    gettimofday(&stIcmp->timestamp, 0);
+    stIcmp->checksum = checksum((unsigned short*)stIcmp, 
+                                sizeof(stIcmp));
+    
+}
 
-int unpackage(char* c, int n, char* c2)
+int unpackage(char* bufRec, int len_struct, char* addr)
 {
     int re = -1;
     return re;
 }
+
 /*Check if argument 1 is an IP addr or a domain Name*/ 
 int checkType(char *argv)
 {
@@ -84,27 +112,19 @@ int checkType(char *argv)
     return type;
 }
 
+
 int main(int argc, char* argv[])
 {
     struct hostent *host;
     struct icmp sendIcmp;
 
-    /*
-    *struct sockaddr_in{
-    * sa_family_t sin_family;
-    * unit15_t sin_port;
-    * struct in_addr sin_addr;
-    * char sin_zerop[8];
-    * }
-    * */
     struct sockaddr_in from;
     struct sockaddr_in to;
-
-    //in_addr_t inaddr;
 
     int sockFd = 0;
 
     char buf[BUF_SIZE];
+
     memset(&from, '\0', sizeof(struct sockaddr_in));
     memset(&to, '\0', sizeof(struct sockaddr_in));
 
@@ -155,7 +175,7 @@ int main(int argc, char* argv[])
     int nbRe = 0;
     int nbSend = 1;
     int nbRecv = 1;
-    for (int i = 0 ; i < 6; ++i)
+    for (int i = 0 ; i < NUM_ICMP; ++i)
     {
         memset(&sendIcmp, '\0', sizeof(struct icmp));
         package(&sendIcmp, nbRe + 1);

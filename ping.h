@@ -15,8 +15,10 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-# define NUM_ICMP 6;
+# define NUM_ICMP 6
 # define BUF_SIZE 1026
+# define ICMP_SEND 8
+# define ICMP_REPOND 0
 struct icmp
 {
     unsigned char type; // unsigned char 8 bit
