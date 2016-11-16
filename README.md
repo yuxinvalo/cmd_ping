@@ -1,7 +1,8 @@
 #cmd_ping
 This is a small program to revise network program in using C. <br/>
 In this project, I implement the cmd **ping** in linux.<br/>
-Step:
+Step:<br/>
+
     - Check IP or Domain name, and analyse the IP of Domain name by function gethostbyname(). 
     - Create a new socket file descriptor. 
     - Package the info in a icmp struct. 
