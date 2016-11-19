@@ -1,12 +1,5 @@
-/*************************************************************************
-	> File Name: ping.h
-	> Author: 
-	> Mail: 
-	> Created Time: sam. 12 nov. 2016 18:54:34 CET
- ************************************************************************/
-
-# ifndef _PING_H
-# define _PING_H
+# ifndef _PING_H_
+# define _PING_H_
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,42 +8,55 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-# define NUM_ICMP 6
-# define BUF_SIZE 1026
-# define ICMP_SEND 8
-# define ICMP_REPOND 0
-struct icmp
-{
-    unsigned char type; // unsigned char 8 bit
-    unsigned char code;
-        
-    unsigned short checksum; // unsigned short 16 bit
-    unsigned short id;
-    unsigned short sequence;
-    struct timeval timestamp;
-};
+#define ICMP_SIZE (sizeof(struct icmp))
+#define ICMP_ECHO 8
+#define BUF_SIZE 1024
+#define NUM   5   
 
-struct ip
-{
-    unsigned char version:4;
-    unsigned char headLen:4;
+#define UCHAR  unsigned char
+#define USHORT unsigned short
+#define UINT   unsigned int 
 
-    unsigned char typeServ;
-    unsigned short len;
-    unsigned short id;          //identifier 标识符
-    unsigned short offset;      //id and offset
-    unsigned char ttl;
-    unsigned char ptcl;         //protocol
-    unsigned short checksum;
-    struct in_addr ipv4Src;
-    struct in_addr ipv4Dst;
+//ICMP structure
+struct icmp{
+    UCHAR           type;      
+    UCHAR           code;      
+    USHORT          checksum;  
+    USHORT          id;        
+    USHORT          sequence;  
+    struct timeval  timestamp; 
 };
 
 
-unsigned short checksum(unsigned short*, int);
-float timediff(struct timeval *, struct timeval *);
-void package(struct icmp*, int);
-int unpackage(char *, int ,char *);
 
+// IP structure
+struct ip{
+    // Check big endian or little endian
+    #if __BYTE_ORDER == __LITTLE_ENDIAN
+    UCHAR   hlen:4;       
+    UCHAR   version:4;     
+    #endif
+    #if __BYTE_ORDER == __BIG_ENDIAN
+    UCHAR   version:4;       
+    UCHAR   hlen:4;    
+    #endif    
+    UCHAR   tos;             
+    USHORT  len;             
+    USHORT  id;                
+    USHORT  offset;            
+    UCHAR   ttl;            
+    UCHAR   protocol;     
+    USHORT  checksum;     
+    struct in_addr ipSrc;    
+    struct in_addr ipDst;   
+};
+
+
+char buf[BUF_SIZE] = {0};
+
+USHORT checkSum(USHORT *, int); // Calculate checksum
+float timediff(struct timeval *, struct timeval *); 
+void icmpInit(struct icmp *, int);  
+int unpack(char *, int, char *);   
 
 #endif /*_PING_H_*/

@@ -1,210 +1,171 @@
 /*************************************************************************
 	> File Name: ping.c
-	> Author: 
-	> Mail: 
-	> Created Time: sam. 12 nov. 2016 19:16:40 CET
-    > Model:
-    >PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
-    >64 bytes from 8.8.8.8: icmp_seq=1 ttl=57 time=3.99 ms
- ************************************************************************/
-
+ 	>	Author: 
+	>	Mail:
+ 	>	Created Time: sam. 12 nov. 2016 19:16:40 CET
+	>
+*************************************************************************/
 #include "ping.h"
-//=============Error Handle============================
-enum err{argErr, sockErr, getHostNameErr, sendErr, recErr, unpErr};
-void printErr(int flag)
-{
-    switch (flag)
-    {
-        case argErr:
-            puts("Arguments number error.");
-            puts("Usage: ping www.xxxx.com or IP addr.");
-            break;
-        case sockErr:
-            puts("Socket init error.");
-            break;
-        case getHostNameErr:
-            puts("Get host name error, can't find it.");
-            break;
-        case sendErr:
-            puts("sendto() socket error, continue.");
-            break;
-        case recErr:
-            puts("recvfrom() socket error, continue.");
-            break;
-        case unpErr:
-            puts("unpack() error, continue.");
-            break;
-        default: puts("Error inexpected!");
-
-    }
-}
-
-
-//=============CHECKSUM================================
-unsigned short checksum(unsigned short* addr, int len_struct)
-{
-    unsigned int sumRe = 0;
-    for (len_struct; len_struct > 1; len_struct-=2)
-    {
-        sumRe = sumRe + *addr++;
-    }
-    
-    if (len_struct == 1)
-    {
-        sumRe = sumRe + *(unsigned char *)addr;
-    }
-
-    sumRe = (sumRe >> 16) + (sumRe & 0xffff);
-    sumRe = sumRe + (sumRe >> 16);
-    return (unsigned short) ~sumRe;
-}
-
-//===========Time back and forth====================== 
-float timediff(struct timeval* begin, struct timeval* end)
-{
-    long int diff = 0;
-    //unit: usec, sec = usec * 1000000
-    diff = (end->tv_sec - begin->tv_sec) * 1000000 + 
-            (end->tv_usec - begin->tv_usec);
-    return (float)(diff / 1000);
-}
-
-//============Pack info and unpack info===============
-void package(struct icmp* stIcmp, int index)
-{
-    stIcmp->type = ICMP_SEND;
-    stIcmp->code = 0;
-    stIcmp->checksum = 0;
-    stIcmp->id = getpid();
-    stIcmp->sequence = index;
-    gettimofday(&stIcmp->timestamp, 0);
-    stIcmp->checksum = checksum((unsigned short*)stIcmp, 
-                                sizeof(stIcmp));
-    
-}
-
-int unpackage(char* bufRec, int len_struct, char* addr)
-{
-    int re = -1;
-    return re;
-}
-
-/*Check if argument 1 is an IP addr or a domain Name*/ 
-int checkType(char *argv)
-{
-
-    //0->IP, 1 DNS
-    int type = 0;
-    in_addr_t inAddr;
-    /*该函数的作用是将用点字符串格式表示的IP地址转换成32big endian
-     * 失败时返回INADDR_NONE
-    */
-    if ((inAddr = inet_addr(argv)) != INADDR_NONE)
-    {
-        printf("IP addr detected.\n");
-        return type;
-    } 
-    else
-    {
-        printf("domain name.\n");
-        type = 1;
-    }
-    return type;
-}
-
-
-int main(int argc, char* argv[])
-{
+int main(int argc, char * argv[]){
     struct hostent *host;
-    struct icmp sendIcmp;
-
+    struct icmp sendicmp;
     struct sockaddr_in from;
     struct sockaddr_in to;
+    int fromlen = 0;
+    int sockfd;
+    int nsend = 0;
+    int nreceived = 0;
+    int i, n;
+    in_addr_t inaddr;
 
-    int sockFd = 0;
+    memset(&from, 0, sizeof(struct sockaddr_in));
+    memset(&to, 0, sizeof(struct sockaddr_in));
 
-    char buf[BUF_SIZE];
-
-    memset(&from, '\0', sizeof(struct sockaddr_in));
-    memset(&to, '\0', sizeof(struct sockaddr_in));
-
-    printf("Start to ping %s....\n", argv[1]);
-    if(argc != 2)
-    {
-        printErr(argErr);
+	printf("Size of struct ip : %ld, size of struct icmp: %ld\n", sizeof(struct ip), sizeof(struct icmp) );
+    if(argc < 2){
+        printf("Usage : %s  hostname/IP address \n", argv[0]);
         exit(1);
     }
 
-    /*Create socket and init
-     *- We use an origin socket-> SOCK_RAW
-     *- We create our ICMP package and send it
-     */
-    if ((sockFd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1)
-    {
-        printErr(sockErr);
+    // generate a origin socket
+    if((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1){
+        printf("socket() error \n");
         exit(1);
     }
 
+    
     to.sin_family = AF_INET;
 
-    //check domain name or ip addr
-    if ((host = gethostbyname(argv[1]) == NULL))
-    {
-        printErr(getHostNameErr);
-        exit(1);
-    }
-    int type = checkType(argv[1]);
-    if (type == 0)//ip addr 
-    {
-        to.sin_addr.s_addr = inet_addr(argv[1]);
-    }
-    else //host name 
-    {
-        host = gethostbyname(argv[1]);
-        for (int i = 0; host->h_addr_list[i]; ++i)
-        {
-            printf("IP addr list  of domain:%s, %lu bytes data. \n", 
-                   inet_ntoa(*(struct in_addr *)host->h_addr_list[i]),
-                   sizeof(struct icmp));
-        }  
-    }
-    printf("Start to ping : %s, %lu bytes data \n...",
-        inet_ntoa(*(struct in_addr *)host->h_addr_list[0]),
-         sizeof(struct icmp));
-    
-    int nbRe = 0;
-    int nbSend = 1;
-    int nbRecv = 1;
-    for (int i = 0 ; i < NUM_ICMP; ++i)
-    {
-        memset(&sendIcmp, '\0', sizeof(struct icmp));
-        package(&sendIcmp, nbRe + 1);
-        printf("send socket index: %d", nbSend + 1); 
-
-        //Send ping package
-        nbSend++;
-        if((nbRe = sendto(sockFd, &sendIcmp, sizeof(struct icmp), 0, (struct sockaddr_in*)&to, sizeof(to)) == -1)){
-        printErr(sendErr);
-        continue;
+    // Detect argument if its an ip or a domain name
+    if(inaddr = inet_addr(argv[1]) == INADDR_NONE){
+        // domain name
+        if((host = gethostbyname(argv[1])) == NULL){
+            printf("gethostbyname() error \n");
+            exit(1);
         }
+        to.sin_addr = *(struct in_addr *)host->h_addr_list[0];
+    }else{
+        // IP address
+        to.sin_addr.s_addr = inaddr;
+    }
 
-        //Receive ping package
-        nbRecv++;
-        if((nbRe = recvfrom(sockFd, &sendIcmp, sizeof(struct icmp), 0,
-            (struct sockaddr_in*)&from, sizeof(to))) == -1)
-        {
-            printErr(recErr);
+    // Output ip info
+    printf("ping %s (%s) : %d bytes of data.\n", argv[1], inet_ntoa(to.sin_addr), (int)ICMP_SIZE);
+
+    //Send socket and receive socket loop
+    for(i = 0; i < NUM; i++){
+        nsend++;  
+        memset(&sendicmp, 0, ICMP_SIZE);
+        icmpInit(&sendicmp, nsend);
+
+        printf("Send socket index %d \n", nsend);
+        if(sendto(sockfd, &sendicmp, ICMP_SIZE, 0, (struct sockaddr *)&to, sizeof(to)) == -1){
+            printf("sendto() error \n");
             continue;
         }
-        printf("receive socket index: %d, and unpack...", nbRecv + 1); 
-        if(unpackage(buf, nbRe, inet_ntoa(from.sin_addr)) == -1)
-        {
-            printErr(unpErr);
-        } 
-        sleep(0.5);
+
+        //n is nb of bits in buf return.
+        if((n = recvfrom(sockfd, buf, BUF_SIZE, 0, (struct sockaddr *)&from, &fromlen)) < 0){
+            printf("recvform() error \n");
+            continue;
+        }
+        nreceived++;  
+	    printf("Receive socket index : %d and unpack .\n", nreceived);
+        if(unpack(buf, n, inet_ntoa(from.sin_addr)) == -1){
+            printf("unpack() error \n");
+        }
+
+        sleep(1);
     }
 
+    // Statistics info
+    printf("---  %s ping statistics ---\n", argv[1]);
+    printf("%d packets transmitted, %d received, %%%d packet loss\n", nsend, nreceived, 
+            (nsend - nreceived) / nsend * 100);
 
     return 0;
+}
 
+
+USHORT checkSum(USHORT *addr, int len){
+    UINT sum = 0;  
+    while(len > 1){
+        sum += *addr++;
+        len -= 2;
+    }
+
+    if(len == 1){
+        sum += *(UCHAR *)addr;
+    }
+
+    sum = (sum >> 16) + (sum & 0xffff);
+    sum += (sum >> 16);
+
+    return (USHORT) ~sum;
+}
+
+
+float timediff(struct timeval *begin, struct timeval *end){
+    int n;
+
+    n = ( end->tv_sec - begin->tv_sec ) * 1000000
+        + ( end->tv_usec - begin->tv_usec );
+
+    return (float) (n / 1000);
+}
+
+
+void icmpInit(struct icmp * icmp, int sequence){
+    icmp->type = ICMP_ECHO;
+    icmp->code = 0;
+    icmp->checksum = 0;
+    icmp->id = getpid();
+    icmp->sequence = sequence;
+    gettimeofday(&icmp->timestamp, 0);
+    icmp->checksum = checkSum((USHORT *)icmp, ICMP_SIZE);
+}
+
+/**
+ * buf  point to buffer msg
+ * len  nb of bits return from recvfrom()
+ * addr IP destination
+ */ 
+int unpack(char * buf, int len, char * addr){
+   int ipheadlen;
+   struct ip * ip;
+   struct icmp * icmp;
+   float rtt;          
+   struct timeval end; 
+
+   ip = (struct ip *)buf;
+
+   // Calculate ip msg length, just ip->headlen x 4
+   ipheadlen = ip->hlen << 2;
+	printf("length of msg : %d \n", len);
+   // pass to ip msg, its icmp 
+   icmp = (struct icmp *)(buf + ipheadlen);
+
+   //length of icmp msg
+   len -= ipheadlen;
+
+   if(len < 8){
+        printf("ICMP packets\'s length is less than 8 \n"); 
+        return -1;
+   }
+
+//Make sure it's the socket that we send to..
+   if(/*icmp->type != ICMP_ECHOREPLY ||*/
+           icmp->id != getpid()){    
+       printf("ICMP packets are not send by us \n");
+       return -1;
+   }
+
+   // Calculate time.
+   gettimeofday(&end, 0);
+   rtt = timediff(&icmp->timestamp, &end);
+
+   printf("%d bytes from %s : icmp_seq=%u ttl=%d rtt=%fms \n",
+           len, addr, icmp->sequence, ip->ttl, rtt);
+
+   return 0;
 }
